@@ -10,10 +10,10 @@
  * governing permissions and limitations under the License.
  */
 
-import {chain} from '@react-aria/utils';
 import {HTMLAttributes, useEffect, useRef} from 'react';
+import {mergeProps} from '@react-aria/utils';
 import {SplitViewAriaProps, SplitViewState} from '@react-types/shared';
-import {useDrag1D} from '@react-aria/utils';
+import {useHover, useKeyboard, useMove} from '@react-aria/interactions';
 import {useId} from '@react-aria/utils';
 
 interface AriaSplitViewProps {
@@ -32,8 +32,9 @@ export function useSplitView(props: SplitViewAriaProps, state: SplitViewState): 
     secondaryMinSize = 304,
     secondaryMaxSize = Infinity,
     orientation = 'horizontal' as 'horizontal',
-    allowsResizing = true,
-    onMouseDown: propsOnMouseDown
+    allowsResizing = true
+    // TODO this really needs to be renamed!
+    // onMouseDown: propsOnMouseDown
   } = props;
   let {containerState, handleState} = state;
   let id = useId(providedId);
@@ -62,36 +63,69 @@ export function useSplitView(props: SplitViewAriaProps, state: SplitViewState): 
     };
   }, [containerRef, containerState, primaryMinSize, primaryMaxSize, secondaryMinSize, secondaryMaxSize, orientation, size]);
 
-  let draggableProps = useDrag1D({
-    containerRef,
-    reverse,
-    orientation,
-    onHover: (hovered) => handleState.setHover(hovered),
-    onDrag: (dragging) => handleState.setDragging(dragging),
-    onPositionChange: (position) => handleState.setOffset(position),
-    onIncrement: () => handleState.increment(),
-    onDecrement: () => handleState.decrement(),
-    onIncrementToMax: () => handleState.incrementToMax(),
-    onDecrementToMin: () => handleState.decrementToMin(),
-    onCollapseToggle: () => handleState.collapseToggle()
+  let {hoverProps} = useHover({
+    isDisabled: !allowsResizing,
+    onHoverStart() {
+      handleState.setHover(true);
+    },
+    onHoverEnd() {
+      handleState.setHover(false);
+    }
+  });
+
+  const handleStateRef = useRef(null);
+  handleStateRef.current = handleState;
+  const currentPosition = useRef<number>(null);
+  const moveProps = useMove({
+    onMoveStart() {
+      currentPosition.current = null;
+    },
+    onMove({deltaX, deltaY}) {
+      if (currentPosition.current == null) {
+        currentPosition.current = handleState.offset;
+      }
+
+      let delta = orientation === 'horizontal' ? deltaX : deltaY;
+      currentPosition.current += reverse ? -delta : delta;
+
+      handleState.setOffset(currentPosition.current);
+    },
+    onMoveEnd() {
+      handleStateRef.current.setDragging(false);
+    }
   });
 
   let ariaValueMin = 0;
   let ariaValueMax = 100;
   let ariaValueNow = (handleState.offset - containerState.minPos) / (containerState.maxPos - containerState.minPos) * 100 | 0;
 
-  let onMouseDown = allowsResizing ? chain(draggableProps.onMouseDown, propsOnMouseDown) : undefined;
-  let onMouseEnter = allowsResizing ? draggableProps.onMouseEnter : undefined;
-  let onMouseOut = allowsResizing ? draggableProps.onMouseOut : undefined;
-  let onKeyDown = allowsResizing ? draggableProps.onKeyDown : undefined;
-  let tabIndex = allowsResizing ? 0 : undefined;
+  let {keyboardProps} = useKeyboard({
+    isDisabled: !allowsResizing,
+    onKeyDown({key}) {
+      if (key === 'Home') {
+        handleState.decrementToMin();
+      }
+      if (key === 'End') {
+        handleState.incrementToMax();
+      }
+    }
+  });
+
+  // TODO should `handleState.setDragging` be set on press or on the first move?
+  let onStart = () => {
+    handleState.setDragging(true);
+    // propsOnMouseDown?.(e);
+  };
+  let onEnd = () => {
+    handleState.setDragging(false);
+  };
 
   return {
     containerProps: {
       id
     },
     handleProps: {
-      tabIndex,
+      tabIndex: allowsResizing ? 0 : undefined,
       'aria-valuenow': ariaValueNow,
       'aria-valuemin': ariaValueMin,
       'aria-valuemax': ariaValueMax,
@@ -99,10 +133,12 @@ export function useSplitView(props: SplitViewAriaProps, state: SplitViewState): 
       'aria-labelledby': props['aria-labelledby'],
       role: 'separator',
       'aria-controls': id,
-      onMouseDown,
-      onMouseEnter,
-      onMouseOut,
-      onKeyDown
+      ...(allowsResizing && mergeProps(moveProps, hoverProps, {
+        onMouseDown: onStart,
+        onTouchStart: onStart,
+        onMouseUp: onEnd,
+        onTouchEnd: onEnd
+      }, keyboardProps))
     },
     primaryPaneProps: {
       id
