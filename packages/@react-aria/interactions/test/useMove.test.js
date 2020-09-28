@@ -22,9 +22,7 @@ function Example(props) {
 }
 
 describe('useMove', function () {
-  // TODO test: clicking without moving
   // TODO test: end event has different target than start
-  // TODO test: rtl
 
   describe('mouse events', function () {
     beforeAll(() => {
@@ -65,6 +63,23 @@ describe('useMove', function () {
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'mouse'}, {type: 'move', pointerType: 'mouse', deltaX: 9, deltaY: -5}]);
       fireEvent.mouseUp(el);
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'mouse'}, {type: 'move', pointerType: 'mouse', deltaX: 9, deltaY: -5}, {type: 'moveend', pointerType: 'mouse'}]);
+    });
+
+    it('doesn\'t fire anything when clicking', function () {
+      let events = [];
+      let addEvent = (e) => events.push(e);
+      let tree = render(
+        <Example
+          onMoveStart={addEvent}
+          onMove={addEvent}
+          onMoveEnd={addEvent} />
+      );
+
+      let el = tree.getByTestId(EXAMPLE_ELEMENT_TESTID);
+
+      fireEvent.mouseDown(el, {pageX: 1, pageY: 30});
+      fireEvent.mouseUp(el);
+      expect(events).toStrictEqual([]);
     });
   });
 
@@ -107,6 +122,23 @@ describe('useMove', function () {
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'touch'}, {type: 'move', pointerType: 'touch', deltaX: 9, deltaY: -5}]);
       fireEvent.touchCancel(el);
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'touch'}, {type: 'move', pointerType: 'touch', deltaX: 9, deltaY: -5}, {type: 'moveend', pointerType: 'touch'}]);
+    });
+
+    it('doesn\'t fire anything when tapping', function () {
+      let events = [];
+      let addEvent = (e) => events.push(e);
+      let tree = render(
+        <Example
+          onMoveStart={addEvent}
+          onMove={addEvent}
+          onMoveEnd={addEvent} />
+      );
+
+      let el = tree.getByTestId(EXAMPLE_ELEMENT_TESTID);
+
+      fireEvent.touchStart(el, {targetTouches: [{pageX: 1, pageY: 30}]});
+      fireEvent.touchEnd(el);
+      expect(events).toStrictEqual([]);
     });
   });
 
@@ -244,6 +276,23 @@ describe('useMove', function () {
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'pen'}, {type: 'move', pointerType: 'pen', deltaX: 9, deltaY: -5}]);
       fireEvent.pointerCancel(el, {pointerType: 'pen'});
       expect(events).toStrictEqual([{type: 'movestart', pointerType: 'pen'}, {type: 'move', pointerType: 'pen', deltaX: 9, deltaY: -5}, {type: 'moveend', pointerType: 'pen'}]);
+    });
+
+    it('doesn\'t fire anything when tapping', function () {
+      let events = [];
+      let addEvent = (e) => events.push(e);
+      let tree = render(
+        <Example
+          onMoveStart={addEvent}
+          onMove={addEvent}
+          onMoveEnd={addEvent} />
+      );
+
+      let el = tree.getByTestId(EXAMPLE_ELEMENT_TESTID);
+
+      fireEvent.pointerDown(el, {pointerType: 'pen', pageX: 1, pageY: 30});
+      fireEvent.pointerUp(el, {pointerType: 'pen'});
+      expect(events).toStrictEqual([]);
     });
   });
 });
